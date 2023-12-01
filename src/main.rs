@@ -243,10 +243,10 @@ impl Zone_3D{
         }
         Zone_3D{segments:vector,zone:zone, capacity:0,eviscerate:EVISCERATE_ZONES.contains(&zone)}
     }    
-    fn feed_setup(self, vector:Vec<host>, time:usize,feed_pd:f64)->Vec<host>{
+    fn feed_setup(self, vector:Vec<host>, time:usize,feed:f64,feed_pd:f64)->Vec<host>{
         let mut vec:Vec<host> = vector.clone();
         for segment in self.clone().segments{
-            host::feed(&mut vec,segment.origin_x.clone(),segment.origin_y.clone(),segment.origin_z.clone(),segment.zone.clone(),time,feed_pd);
+            host::feed(&mut vec,segment.origin_x.clone(),segment.origin_y.clone(),segment.origin_z.clone(),segment.zone.clone(),time,feed,feed_pd);
         }
         vec
     }
@@ -355,6 +355,7 @@ impl Zone_3D{
 
 #[derive(Clone)]
 pub struct host{
+    contaminated:bool,
     infected:bool,
     number_of_times_infected:u32,
     time_infected:f64,
@@ -384,22 +385,22 @@ pub struct host{
 }
 //Note that if you want to adjust the number of zones, you have to, in addition to adjusting the individual values to your liking per zone, also need to change the slice types below!
 //Parameterization options
+//Parameterization options
 const ACCELERATION:f64 = 0.4; //factor by which delta is decreased as we approach better fit value i.e. Bigger value -> More aggressive
 const DECELERATION:f64 = 0.1; //factor that represents the percentage value of a delta change we take as rate of objective function decrease (trending towards ideal solution - decreases)
 const PINPOINT:bool = false;
 const PERCENTILE_MONITOR:f64 = 0.01; // 10th percentile values of all tests
 const WEIGHT:f64 = 0.4; //percentage that this concert of best fit parameter estimates continue to influence the parameter estimate
-// const WEIGHT_INITIATION_POINT:usize = 5; //When do we weight for the percentile parameters?How many 
-//I.e. Smaller figure -> More punishing
 //Resolution
-const STEP:[[usize;3];1] = [[4,4,4]];  //Unit distance of segments ->Could be used to make homogeneous zoning (Might not be very flexible a modelling decision)
+const STEP:[[usize;3];2] = [[10,10,10],[10,10,10]];  //Unit distance of segments ->Could be used to make homogeneous zoning (Might not be very flexible a modelling decision)
 const HOUR_STEP: f64 = 4.0; //Number of times hosts move per hour
-const LENGTH: usize =57*24; //How long do you want the simulation to be?
+const LENGTH: usize =1400; //How long do you want the simulation to be?
 //Infection/Colonization module
 // ------------Do only colonized hosts spread disease or do infected hosts spread
-const HOST_0:f64 = 3.0;
+const HOST_0:f64 = 10.0;
 const COLONIZATION_SPREAD_MODEL:bool = true;
 const TIME_OR_CONTACT:bool = true; //true for time -> contact uses number of times infected to determine colonization
+const IMMORTAL_CONTAMINATION:bool = false;
 //If you want to use a truncated normal distribution for time to go from infected to colonized ...
 const TIME_TO_COLONIZE:[f64;2] = [5.0*24.0, 11.6*24.0]; //95% CI for generation time
 const COLONIZE_TIME_MAX_OVERRIDE:f64 = 26.0*24.0;
@@ -408,46 +409,47 @@ const ADJUSTED_TIME_TO_COLONIZE:[f64;2] = [4.5,1.0/2.0];  //In days, unlike hour
 const PROBABILITY_OF_HORIZONTAL_TRANSMISSION:f64 = 0.05; //Chance of infected, but not yet colonized host, infecting their own deposits-> eggs
 // const RATE_OF_COLONIZATION_DECAY: f64 = 0.17;
 const FECAL_SHEDDING_PERIOD:f64 = 19.77*24.0;//Period in of which faeces from infected hosts will be infected, after which they will not be.
-// const RECOVERY_RATE:[f64;2] = [0.00044264,0.00066390]; //Lower and upper range that increases with age
 const RECOVERY_RATE:[f64;2] = [0.002,0.008]; //Lower and upper range that increases with age
 
 
 const NO_TO_COLONIZE:u32 = 100;
-//Infection rules
+//Contamination rules | Different from infections, which are taken to only be transmittable via feeding of infected faeces 
 const HOSTTOHOST_CONTACT_SPREAD:bool = true; // Host -> Host, Host -> Faeces and Host -> Eggs via spatial proximity
-const HOSTTOEGG_CONTACT_SPREAD:bool = false;
+const HOSTTOEGG_CONTACT_SPREAD:bool = true;
 const HOSTTOFAECES_CONTACT_SPREAD:bool = false;
-const EGGTOHOST_CONTACT_SPREAD:bool = false;
+const EGGTOHOST_CONTACT_SPREAD:bool = true;
 const FAECESTOHOST_CONTACT_SPREAD:bool = true;
 const EGGTOFAECES_CONTACT_SPREAD:bool = true;
 const FAECESTOEGG_CONTACT_SPREAD:bool = true;
 // const INITIAL_COLONIZATION_RATE:f64 = 0.47; //Probability of infection, resulting in colonization -> DAILY RATE ie PER DAY
 //Space
-const LISTOFPROBABILITIES:[f64;1] = [0.15]; //Probability of transfer of samonella per zone - starting from zone 0 onwards
-const GRIDSIZE:[[f64;3];1] = [[120.0,4.0,4.0]];
-const MAX_MOVE:f64 = 1.0;
-const MEAN_MOVE:f64 = 0.5;
-const STD_MOVE:f64 = 1.0; // separate movements for Z config    
+const LISTOFPROBABILITIES:[f64;2] = [0.8,0.8]; //Probability of transfer of disease per zone - starting from zone 0 onwards
+const CONTACT_TRANSMISSION_PROBABILITY:[f64;2] = [0.8,0.8];
+const GRIDSIZE:[[f64;3];2] = [[100.0,100.0,40.0],[100.0,100.0,40.0]];
+const MAX_MOVE:f64 = 10.0;
+const MEAN_MOVE:f64 = 4.0;
+const STD_MOVE:f64 = 3.0; // separate movements for Z config
 const MAX_MOVE_Z:f64 = 1.0;
 const MEAN_MOVE_Z:f64 = 2.0;
 const STD_MOVE_Z:f64 = 4.0;
-const NO_OF_HOSTS_PER_SEGMENT:[u64;1] = [2];
+const NO_OF_HOSTS_PER_SEGMENT:[u64;2] = [12,8];
 //Anchor points
 //Vertical perches
 const PERCH:bool = false;
+const PERCH_ZONES:[usize;1]= [4];
 const PERCH_HEIGHT:f64 = 2.0; //Number to be smaller than segment range z -> Denotes frequency of heights at which hens can perch
-const PERCH_FREQ:f64 = 0.15; //probability that hosts go to perch
-const DEPERCH_FREQ:f64 = 0.4; //probability that a chicken when already on perch, decides to go down from perch
+const PERCH_FREQ:f64 = 0.5; //probability that hosts go to perch
+const DEPERCH_FREQ:f64 = 0.4; //probability that a host when already on perch, decides to go down from perch
 //Nesting areas
 const NEST:bool = false;
 const NESTING_AREA:f64 = 0.25; //ratio of the total area of segment in of which nesting area is designated - min x y z side
 //Space --- Segment ID
-const TRANSFERS_ONLY_WITHIN:[bool;1] = [false]; //Boolean that informs simulation to only allow transmissions to occur WITHIN segments, not between adjacent segments
+const TRANSFERS_ONLY_WITHIN:[bool;2] = [false,false]; //Boolean that informs simulation to only allow transmissions to occur WITHIN segments, not between adjacent segments
 //Fly option
 const FLY:bool = false;
 const FLY_FREQ:u8 = 3; //At which Hour step do the  
 //Disease 
-const TRANSFER_DISTANCE: f64 = 1.3;//maximum distance over which hosts can trasmit diseases to one another
+const TRANSFER_DISTANCE: f64 = 1.0;//maximum distance over which hosts can trasmit diseases to one another
 const SIZE_FACTOR_FOR_EGGS:f64 = 0.15; //eggs are significantly smaller than their original hosts, so it stands to reason that their transfer distance for contact spread should be smaller
 //Host parameters
 const PROBABILITY_OF_INFECTION:f64 = 0.12; //probability of imported host being infected
@@ -464,15 +466,18 @@ const DEPOSIT_RATE_INFECTION_MULTIPLIER:f64 = 2.0/3.0;
 //
 
 //Feed parameters
-const FEED_1:bool = false; //Do the hosts get fed - omnipotent method
+const FEED_1:bool = true; //Do the hosts get fed - omnipotent method -> Like feeder belts (adjust Feed infected and Feed infection rate for that) or simply one on one at the same time (true omnipotent method)
 const FEED_2:bool = false;//Do the hosts get fed - with standalone feeders ->crowding implication
-const FEED_INFECTION_RATE:f64 = 0.003; //Probability of feed being infected
-const FEED_ZONES:[usize;1] = [1]; //To set the zones that have feed provided to them.
-const FEED_TIMES: [usize;2] = [11,14]; //24h format, when hosts get fed: Does not have to be only 2 - has no link to number of zones or anything like that
+const FEED_INFECTED:f64 = 0.11; //Proportion of times that feed gets infected - set to 1.0 if you simply want to simulate separate feed sources that are independent of each other in terms of being infected at start 
+const FEED_INFECTION_RATE:f64 = 0.8; //Probability of INFECTED FEED infecting hosts that consume it - CAN either mean a. probability that independent feed is infected (ind. of other feed sources being infected at the time) b. ALL feed at time is infected, and this denotes chance that consumption of infected feed leads to infection in host
+const FEED_ZONES:[usize;2] = [0,1]; //To set the zones that have feed provided to them.
+const FEED_TIMES: [usize;2] = [11,5]; //24h format, when hosts get fed: Does not have to be only 2 - has no link to number of zones or anything like that
 const FEEDER_SPACING:f64 = 2.5;
 const FEED_DURATION:f64 = 0.5;
+
+
 //Purge/Slaughter parameters
-const SLAUGHTER_POINT:usize = 1; //Somewhere in zone {}, the hosts are slaughtered/killed and will cease to produce any eggs or faeces
+const SLAUGHTER_POINT:usize = 10; //Somewhere in zone {}, the hosts are slaughtered/killed and will cease to produce any eggs or faeces
 //Evisceration parameters
 const EVISCERATE:bool = false;
 const EVISCERATE_ZONES:[usize;1] = [2]; //Zone in which evisceration takes place
@@ -484,7 +489,7 @@ const MISHAP:bool = false;
 const MISHAP_PROBABILITY:f64 = 0.01;
 const MISHAP_RADIUS:f64 = 9.0; //Must be larger than the range_x of the eviscerate boxes for there to be any change in operation
 //Transfer parameters
-const ages:[f64;1] = [800.0*24.0]; //Time hosts are expected spend in each region minimally
+const ages:[f64;2] = [4.0,20.0]; //Time hosts are expected spend in each region minimally
 //Collection
 const AGE_OF_HOSTCOLLECTION: f64 = 20.0*24.0;  //For instance if you were collecting hosts every 15 days
 const COLLECT_DEPOSITS: bool = true;
@@ -515,22 +520,21 @@ impl host{
             let grad:f64 = (rec1-rec0)/(MAX_AGE - MIN_AGE);
             let prob:f64 = rec0+(x.age-MIN_AGE) * grad;            
             if roll(prob){
-                if x.infected && x.motile == 0 && !x.colonized{
-                    x.infected = false;
-                    x.colonized = false;
-                    x.time_infected = 0.0;
-                    x.number_of_times_infected = 0;
-                    x.generation_time =gamma(ADJUSTED_TIME_TO_COLONIZE[0],ADJUSTED_TIME_TO_COLONIZE[1])*24.0;
-                }                 
-            }
+                if !IMMORTAL_CONTAMINATION{x.contaminated = false;}
+                x.infected = false;
+                x.colonized = false;
+                x.time_infected = 0.0;
+                x.number_of_times_infected = 0;                    
+                x.generation_time =gamma(ADJUSTED_TIME_TO_COLONIZE[0],ADJUSTED_TIME_TO_COLONIZE[1])*24.0;
+            }              
         })
     }
 
-    fn feed(mut vector:&mut Vec<host>, origin_x:u64,origin_y:u64,origin_z:u64, zone:usize,time:usize,feed_pd:f64){
-        if FEED_1&&roll(feed_pd){
+    fn feed(mut vector:&mut Vec<host>, origin_x:u64,origin_y:u64,origin_z:u64, zone:usize,time:usize,feed:f64,feed_pd:f64){
+        if FEED_1&&roll(feed){
             // println!("Infected feed confirmed");
             vector.iter_mut().for_each(|mut h|{
-                if h.motile == 0 && !h.infected && h.origin_x == origin_x && h.origin_y == origin_y && h.origin_z == origin_z && h.zone == zone{
+                if roll(feed_pd) && h.motile == 0 && !h.infected && h.origin_x == origin_x && h.origin_y == origin_y && h.origin_z == origin_z && h.zone == zone{
                     h.infected = h.transfer(1.0);
                     println!("{} {} {} {} {} {}",h.x,h.y,h.z,10,time,h.zone); //10 is now an interaction type driven by the infected feed
                 }
@@ -553,6 +557,7 @@ impl host{
             // let counter:usize = 0;
             for x in 1..x_no{
                 for y in 1..y_no{
+                    let is_feed_infected:bool = roll(feed);
                     //relative origin_location to segment frame of reference
                     let x_location = FEEDER_SPACING*(x as f64);
                     let y_location = FEEDER_SPACING*(y as f64);
@@ -562,17 +567,21 @@ impl host{
                     vector.iter_mut().filter(|h| h.motile == 0 && h.origin_x == origin_x && h.origin_y == origin_y && h.origin_z == origin_z && h.zone == zone).skip(start_index).take(per).for_each(|h| {
                         h.eat_x = x_location;
                         h.eat_y = y_location;
+                        if is_feed_infected && !h.infected && roll(feed_pd){
+                            h.infected = h.transfer(1.0);
+                            println!("{} {} {} {} {} {}",h.x,h.y,h.z,10,time,h.zone); //10 is now an interaction type driven by the infected feed
+                        }                        
                     })
                 }
             }
-            if roll(feed_pd){
-                vector.iter_mut().for_each(|mut h|{
-                    if h.motile == 0 && !h.infected && h.origin_x == origin_x && h.origin_y == origin_y && h.origin_z == origin_z && h.zone == zone{
-                        h.infected = h.transfer(1.0);
-                        println!("{} {} {} {} {} {}",h.x,h.y,h.z,10,time,h.zone); //10 is now an interaction type driven by the infected feed
-                    }
-                })                       
-            }
+            // if roll(feed_pd){
+            //     vector.iter_mut().for_each(|mut h|{
+            //         if h.motile == 0 && !h.infected && h.origin_x == origin_x && h.origin_y == origin_y && h.origin_z == origin_z && h.zone == zone{
+            //             h.infected = h.transfer(1.0);
+            //             println!("{} {} {} {} {} {}",h.x,h.y,h.z,10,time,h.zone); //10 is now an interaction type driven by the infected feed
+            //         }
+            //     })                       
+            // }
         }
     }    
     fn infect(mut vector:Vec<host>,loc_x:u64,loc_y:u64,loc_z:u64,zone:usize)->Vec<host>{
@@ -684,11 +693,11 @@ impl host{
         //We shall make it such that the chicken is spawned within the bottom left corner of each "restricted grid" - ie cage
         let prob:f64 = probability;
         //Add a random age generator
-        host{infected:false,number_of_times_infected:0,time_infected:0.0,generation_time:gamma(atc0,atc1)*24.0,colonized:false,motile:0,zone:zone,prob1:prob,prob2:std,x:loc_x as f64,y:loc_y as f64,z:loc_z as f64,perched:false,eating:false,eat_x:0.0,eat_y:0.0,eating_time:0.0,age:normal_(MIN_AGE,MEAN_AGE,STD_AGE,MAX_AGE),time:0.0, origin_x:loc_x as u64,origin_y:loc_y as u64,origin_z: loc_z as u64,restrict:restriction,range_x:range_x,range_y:range_y,range_z:range_z}
+        host{contaminated:false,infected:false,number_of_times_infected:0,time_infected:0.0,generation_time:gamma(atc0,atc1)*24.0,colonized:false,motile:0,zone:zone,prob1:prob,prob2:std,x:loc_x as f64,y:loc_y as f64,z:loc_z as f64,perched:false,eating:false,eat_x:0.0,eat_y:0.0,eating_time:0.0,age:normal_(MIN_AGE,MEAN_AGE,STD_AGE,MAX_AGE),time:0.0, origin_x:loc_x as u64,origin_y:loc_y as u64,origin_z: loc_z as u64,restrict:restriction,range_x:range_x,range_y:range_y,range_z:range_z}
     }
     fn new_inf(zone:usize, std:f64,loc_x:f64, loc_y:f64,loc_z:f64,restriction:bool,range_x:u64,range_y:u64,range_z:u64, atc0:f64, atc1:f64,probability:f64)->host{ //presumably a newly infected chicken that spreads disease is colonized
         let prob:f64 = probability;
-        host{infected:true,number_of_times_infected:0,time_infected:0.0,generation_time:gamma(atc0,atc1)*24.0,colonized:true,motile:0,zone:zone,prob1:prob,prob2:std,x:loc_x as f64,y:loc_y as f64,z:loc_z as f64,perched:false,eating:false,eat_x:0.0,eat_y:0.0,eating_time:0.0,age:normal_(MIN_AGE,MEAN_AGE,STD_AGE,MAX_AGE),time:0.0, origin_x:loc_x as u64,origin_y:loc_y as u64,origin_z: loc_z as u64,restrict:restriction,range_x:range_x,range_y:range_y,range_z:range_z}
+        host{contaminated:false,infected:true,number_of_times_infected:0,time_infected:0.0,generation_time:gamma(atc0,atc1)*24.0,colonized:true,motile:0,zone:zone,prob1:prob,prob2:std,x:loc_x as f64,y:loc_y as f64,z:loc_z as f64,perched:false,eating:false,eat_x:0.0,eat_y:0.0,eating_time:0.0,age:normal_(MIN_AGE,MEAN_AGE,STD_AGE,MAX_AGE),time:0.0, origin_x:loc_x as u64,origin_y:loc_y as u64,origin_z: loc_z as u64,restrict:restriction,range_x:range_x,range_y:range_y,range_z:range_z}
     }
     fn deposit(&mut self, consumable: bool,prob:f64)->host{ //Direct way to lay deposit from host. The function is 100% deterministic and layering a probability clause before this is typically expected
         let zone = self.zone.clone();
@@ -731,13 +740,13 @@ impl host{
                 self.x = x.clone();
                 self.y = y.clone();
             }
-            host{infected:inf,number_of_times_infected:0,time_infected:0.0,generation_time:self.generation_time,colonized:inf,motile:1,zone:zone,prob1:prob1,prob2:prob2,x:x,y:y,z:z,perched:false,eating:self.eating,eat_x:self.eat_x,eat_y:self.eat_y,eating_time:self.eating_time,age:0.0,time:0.0,origin_x:x as u64,origin_y:y as u64,origin_z:z as u64,restrict:restriction,range_x:range_x,range_y:range_y,range_z:range_z}
+            host{contaminated:inf,infected:inf,number_of_times_infected:0,time_infected:0.0,generation_time:self.generation_time,colonized:inf,motile:1,zone:zone,prob1:prob1,prob2:prob2,x:x,y:y,z:z,perched:false,eating:self.eating,eat_x:self.eat_x,eat_y:self.eat_y,eating_time:self.eating_time,age:0.0,time:0.0,origin_x:x as u64,origin_y:y as u64,origin_z:z as u64,restrict:restriction,range_x:range_x,range_y:range_y,range_z:range_z}
             //Returning new egg host to host vector
         }
         else{//fecal shedding
 
             // println!("Pooping!");
-            host{infected:inf,number_of_times_infected:0,time_infected:0.0,generation_time:self.generation_time,colonized:inf,motile:2,zone:zone,prob1:prob1,prob2:prob2,x:x,y:y,z:z,perched:false,eating:self.eating,eat_x:self.eat_x,eat_y:self.eat_y,eating_time:self.eating_time,age:0.0,time:0.0,origin_x:x as u64,origin_y:y as u64,origin_z:z as u64,restrict:restriction,range_x:range_x,range_y:range_y,range_z:range_z}
+            host{contaminated:inf,infected:inf,number_of_times_infected:0,time_infected:0.0,generation_time:self.generation_time,colonized:inf,motile:2,zone:zone,prob1:prob1,prob2:prob2,x:x,y:y,z:z,perched:false,eating:self.eating,eat_x:self.eat_x,eat_y:self.eat_y,eating_time:self.eating_time,age:0.0,time:0.0,origin_x:x as u64,origin_y:y as u64,origin_z:z as u64,restrict:restriction,range_x:range_x,range_y:range_y,range_z:range_z}
         }
     }
     fn deposit_all(vector:Vec<host>, probability:f64)->Vec<host>{
@@ -868,7 +877,7 @@ impl host{
                     self.perched = false;
                 }
             }            
-            host{infected:self.infected,number_of_times_infected:0,time_infected:self.time_infected,generation_time:self.generation_time,colonized:self.colonized,motile:self.motile,zone:self.zone,prob1:self.prob1,prob2:self.prob2,x:new_x,y:new_y,z:self.z,perched:self.perched,eating:eating,eat_x:self.eat_x,eat_y:self.eat_y,eating_time:eating_time,age:self.age+1.0/HOUR_STEP,time:self.time+1.0/HOUR_STEP,origin_x:self.origin_x,origin_y:self.origin_y,origin_z:self.origin_z,restrict:self.restrict,range_x:self.range_x,range_y:self.range_y,range_z:self.range_z}
+            host{contaminated:self.contaminated,infected:self.infected,number_of_times_infected:0,time_infected:self.time_infected,generation_time:self.generation_time,colonized:self.colonized,motile:self.motile,zone:self.zone,prob1:self.prob1,prob2:self.prob2,x:new_x,y:new_y,z:self.z,perched:self.perched,eating:eating,eat_x:self.eat_x,eat_y:self.eat_y,eating_time:eating_time,age:self.age+1.0/HOUR_STEP,time:self.time+1.0/HOUR_STEP,origin_x:self.origin_x,origin_y:self.origin_y,origin_z:self.origin_z,restrict:self.restrict,range_x:self.range_x,range_y:self.range_y,range_z:self.range_z}
         }else if self.motile==0 && EVISCERATE_ZONES.contains(&self.zone){
             // println!("Evisceration pending...");
             // self.motile == 1; //It should be presumably electrocuted and hung on a conveyer belt
@@ -1022,6 +1031,79 @@ impl host{
         inventory
     }
     
+    
+    fn contaminate(mut inventory: Vec<host>, time: usize)->Vec<host>{
+        // Locate all infected/colonized hosts
+        let mut cloneof: Vec<host> = inventory.clone();
+        //Infectors
+        cloneof = cloneof
+            .into_par_iter()
+            .filter_map(|mut x| {
+                if (x.contaminated){
+                    Some(x)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        // println!("Length of infectors is {}",cloneof.len());
+        // //to be infected
+        // if COLONIZATION_SPREAD_MODEL{
+        //     inventory = inventory.into_par_iter().filter(|x| (!x.colonized && x.motile == 0) || (!x.infected && x.motile != 0) ).collect::<Vec<host>>();
+        // }else{
+        //     inventory = inventory.into_par_iter().filter(|x| !x.infected).collect::<Vec<host>>(); //potentially to save bandwidth, let us remove the concept of colonization in eggs and faeces -> don't need to log colonization in faeces especially!
+        // }
+        inventory = inventory.into_par_iter().filter(|x| !x.contaminated).collect::<Vec<host>>();
+        //Infection process - both elements concerned here
+        inventory = inventory
+            .into_par_iter()
+            .filter_map(|mut x| {
+                for inf in &cloneof {
+                    let segment_boundary_condition:bool = !TRANSFERS_ONLY_WITHIN[x.zone] || TRANSFERS_ONLY_WITHIN[x.zone] && x.origin_x == inf.origin_x && x.origin_y == inf.origin_y && x.origin_z == inf.origin_z;
+                    let hosttohost_contact_rules:bool = (HOSTTOHOST_CONTACT_SPREAD || !HOSTTOHOST_CONTACT_SPREAD && !(inf.motile == 0 && x.motile ==0));
+                    let hosttoegg_contact_rules:bool = (HOSTTOEGG_CONTACT_SPREAD || (!HOSTTOEGG_CONTACT_SPREAD && !(inf.motile == 0 && x.motile == 1)));
+                    let hosttofaeces_contact_rules:bool = (HOSTTOFAECES_CONTACT_SPREAD || !HOSTTOFAECES_CONTACT_SPREAD &&!(inf.motile == 0 && x.motile == 2));
+                    let eggtohost_contact_rules:bool = (EGGTOHOST_CONTACT_SPREAD || !EGGTOHOST_CONTACT_SPREAD && !(inf.motile == 1 && x.motile == 0));
+                    let faecestohost_contact_rules:bool = (FAECESTOHOST_CONTACT_SPREAD || !FAECESTOHOST_CONTACT_SPREAD &&!(inf.motile == 2 && x.motile == 0));
+                    let eggtofaeces_contact_rules:bool = (EGGTOFAECES_CONTACT_SPREAD || !EGGTOFAECES_CONTACT_SPREAD && !(inf.motile ==  1 && x.motile == 2));
+                    let faecestoegg_contact_rules:bool = (FAECESTOEGG_CONTACT_SPREAD || !FAECESTOEGG_CONTACT_SPREAD && !(inf.motile ==  2 && x.motile == 1));
+                    let contact_rules:bool = hosttohost_contact_rules && hosttoegg_contact_rules && hosttofaeces_contact_rules && eggtohost_contact_rules && faecestohost_contact_rules && eggtofaeces_contact_rules && faecestoegg_contact_rules;
+                    if host::dist(inf, &x) && inf.zone == x.zone && segment_boundary_condition && contact_rules && !x.contaminated{
+                        let before = x.contaminated.clone();
+                        x.contaminated = roll(x.prob2);
+                        if !before && x.contaminated {
+                            if x.motile != 0{x.infected = true;} //"Contaminated deposits are the equivalent to infected deposits"
+                            if x.x != 0.0 && x.y != 0.0 {
+                                let mut diagnostic:i8 = 1;
+                                if x.motile>inf.motile{
+                                    diagnostic = -1;
+                                }
+                                // Access properties of 'inf' here
+                                println!(
+                                    "{} {} {} {} {} {}",
+                                    x.x,
+                                    x.y,
+                                    x.z,
+                                    diagnostic*(((x.motile+1) as i8) * ((inf.motile+1) as i8) + 100), 
+                                    time,
+                                    x.zone
+                                );
+                                // if x.zone == 2 && diagnostic*((x.motile+1) as i8) * ((inf.motile+1) as i8)==1{
+                                //     println!("INAPPROPRIATE INTERACTION @ zone 2 Delta x : {},Delta y : {},Delta z : {} -> Segments between 2 hosts are the same? : {}",x.x-inf.x,x.y-inf.y,x.z-inf.z,x.origin_x == inf.origin_x&&x.origin_y == inf.origin_y&&x.origin_z == inf.origin_z);
+                                //     panic!();
+                                // }
+                            }
+                        }
+                    }
+                }
+                Some(x)
+            })
+            .collect();
+        inventory.extend(cloneof);
+        inventory
+    }
+
+
     fn cleanup(inventory:Vec<host>)->(Vec<host>,Vec<host>){
         inventory.into_par_iter().partition(|x| x.motile==2 || (!COLLECT_DEPOSITS && x.motile == 1))
     }
@@ -1159,7 +1241,7 @@ impl host{
 }
 
 
-fn test(parameters:[f64;8],fit_to:Vec<(usize,f64)>)->f64{
+fn test(parameters:[f64;9],fit_to:Vec<(usize,f64)>)->f64{
     let mut hosts: Vec<host> = Vec::new();
     let mut faecal_inventory: Vec<host> = Vec::new();
     let mut hosts_in_collection:[u64;2] = [0,1];
@@ -1257,7 +1339,7 @@ fn test(parameters:[f64;8],fit_to:Vec<(usize,f64)>)->f64{
         for times in FEED_TIMES{
             if time%24 ==times && time>0 && (FEED_1 || FEED_2){
                 for spaces in FEED_ZONES{
-                    hosts = zones[spaces].clone().feed_setup(hosts,time.clone(),parameters[6]);
+                    hosts = zones[spaces].clone().feed_setup(hosts,time.clone(),parameters[6],parameters[7]);
                 }
             }
         }
@@ -1274,6 +1356,7 @@ fn test(parameters:[f64;8],fit_to:Vec<(usize,f64)>)->f64{
             // println!("Number of poop is {}",hosts.clone().into_iter().filter(|x| x.motile == 2).collect::<Vec<_>>().len() as u64);
             hosts = host::shuffle_all(hosts);
             hosts = host::transmit(hosts,time.clone());
+            hosts = host::contaminate(hosts,time.clone());
             if FLY && unit != 0 && (unit % FLY_FREQ as usize) == 0{
                 hosts = host::land(hosts);
             }
@@ -1399,15 +1482,15 @@ fn test(parameters:[f64;8],fit_to:Vec<(usize,f64)>)->f64{
 
 
 
-fn parameterize(ind:Vec<usize>,epoch:usize, rollover:usize,values_and_deltas:Vec<[f64;3]>,fit_to:Vec<(usize,f64)>)->Vec<[f64;9]>{
+fn parameterize(ind:Vec<usize>,epoch:usize, rollover:usize,values_and_deltas:Vec<[f64;3]>,fit_to:Vec<(usize,f64)>)->Vec<[f64;10]>{
     //The input vector of values and deltas is meant to consist ofslices strictly of size 3 that designate the range of the values that we want to change between, and the delta step with
     //which we wish to intiailly step
 
     //We will consider a deceleration and acceleration mechanic shortly
-    let mut output:Vec<[f64;9]> = Vec::new(); //All parameter/factor values, terminating with the associated MSE value
+    let mut output:Vec<[f64;10]> = Vec::new(); //All parameter/factor values, terminating with the associated MSE value
     //First consider that we only wish to allow one or more out of the 8 available variables to be changed.
     //Extract public values
-    let mut ini:[f64;8] = [ADJUSTED_TIME_TO_COLONIZE[0],ADJUSTED_TIME_TO_COLONIZE[1],PROBABILITY_OF_HORIZONTAL_TRANSMISSION,RECOVERY_RATE[0],RECOVERY_RATE[1],LISTOFPROBABILITIES[0],FEED_INFECTION_RATE,HOST_0];
+    let mut ini:[f64;9] = [ADJUSTED_TIME_TO_COLONIZE[0],ADJUSTED_TIME_TO_COLONIZE[1],PROBABILITY_OF_HORIZONTAL_TRANSMISSION,RECOVERY_RATE[0],RECOVERY_RATE[1],LISTOFPROBABILITIES[0],FEED_INFECTED,FEED_INFECTION_RATE,HOST_0];
     //Change out the values we wish to change with the average of the values presented inside rollover for the indices indicated by ind
     let mut tt:usize = 0;
     for ele in ind.clone(){
@@ -1415,7 +1498,7 @@ fn parameterize(ind:Vec<usize>,epoch:usize, rollover:usize,values_and_deltas:Vec
         ini[ele] /= 2.0;
         tt+=1;
     }
-    let mut prev_ini:[f64;8] = ini.clone();
+    let mut prev_ini:[f64;9] = ini.clone();
     //MSE objective scores
     let mut MSE_previous:f64 = test(ini,fit_to.clone());
     let mut MSE:f64 = test(ini,fit_to.clone());
@@ -1430,7 +1513,7 @@ fn parameterize(ind:Vec<usize>,epoch:usize, rollover:usize,values_and_deltas:Vec
     //Weighing down algorithm
     let mut are_we_close:bool = false;
     for run in 0..epoch{
-        let mut anchors:Vec<[f64;9]> = Vec::new();
+        let mut anchors:Vec<[f64;10]> = Vec::new();
         //How many times have you approached/diverged from the goal?
         let mut reward_counter:f64 = 1.0;
         let mut direction_polarity:f64 = 1.0;
@@ -1440,9 +1523,10 @@ fn parameterize(ind:Vec<usize>,epoch:usize, rollover:usize,values_and_deltas:Vec
             println!("Variables {:?}",ini.clone());
             // println!("Here is a sample test value {}", test(ini, fit_to.clone()));
             MSE_previous = MSE.clone();
-            let mut ini2:[f64;8] = ini.clone();
+            let mut ini2:[f64;9] = ini.clone();
             ini2[var_index] = values_and_deltas[tt][1] - ini2[var_index];
             MSE = test(ini,fit_to.clone());
+            println!("WHERE DAFUQ IS THIS NIGGER MSE VALUE? {}",MSE);
             //Mirror test
             if run%(epoch.clone()/10)==0{
                 if test(ini2,fit_to.clone()) <MSE{ini[var_index] = ini2[var_index];}
@@ -1452,11 +1536,11 @@ fn parameterize(ind:Vec<usize>,epoch:usize, rollover:usize,values_and_deltas:Vec
             delta_ratio_previous = delta_ratio.clone();
             delta_ratio = (delta/delta_previous).abs();
             println!("MSE previous {} vs MSE {} at epoch {} - fitted factor value is {}", MSE_previous,MSE,run.clone(),ini[var_index]);
-            let mut unit:[f64;9] = [0.0;9];
+            let mut unit:[f64;10] = [0.0;10];
             for thing in 0..ini.len(){
                 unit[thing]+=ini[thing];
             }
-            unit[8] += MSE;
+            unit[9] += MSE;
             output.push(unit);
             if MSE<1.0 && PINPOINT{break;}
             if MSE<MSE_previous{
@@ -1520,7 +1604,7 @@ fn parameterize(ind:Vec<usize>,epoch:usize, rollover:usize,values_and_deltas:Vec
         }
     }
     let perc:f64 = calculate_percentile(&output,PERCENTILE_MONITOR);
-    let mut anchors:Vec<[f64;9]> = output.clone().into_iter().filter(|x| x[output[0].len()-1]<=perc).collect();
+    let mut anchors:Vec<[f64;10]> = output.clone().into_iter().filter(|x| x[output[0].len()-1]<=perc).collect();
 
     for index in ind{
         let mut min_max_first: (f64, f64) = (f64::MAX, f64::MIN);
@@ -1537,27 +1621,27 @@ fn parameterize(ind:Vec<usize>,epoch:usize, rollover:usize,values_and_deltas:Vec
     output
 }
 
-fn calculate_percentile(data: &Vec<[f64; 9]>, percentile: f64) -> f64 {
+fn calculate_percentile(data: &Vec<[f64; 10]>, percentile: f64) -> f64 {
     let mut sorted_data = data.clone();
-    sorted_data.sort_by(|a, b| a[8].partial_cmp(&b[8]).unwrap());
+    sorted_data.sort_by(|a, b| a[9].partial_cmp(&b[9]).unwrap());
     let index = (percentile* (sorted_data.len() as f64 - 1.0)) as usize;
-    sorted_data[index][8]
+    sorted_data[index][9]
 }
 
 fn main(){
-    let ind:Vec<usize> = vec![3,4,5];
-    let epochs:usize = 500;
+    let ind:Vec<usize> = vec![5];
+    let epochs:usize = 50;
     //Changing parameter values 
     //parameters vector is to contain the following parameters in order : [ADJUSTED COLONIZATION TIME 0,ADJUSTED COLONIZATION TIME 1,Deposit probability (horizontal), recovery rate 0, recovery rate 1, probability of disease transmission (contact),feed infection probability ]
-    let parameters:[f64;8] = [ADJUSTED_TIME_TO_COLONIZE[0],ADJUSTED_TIME_TO_COLONIZE[1],PROBABILITY_OF_HORIZONTAL_TRANSMISSION,RECOVERY_RATE[0],RECOVERY_RATE[1],LISTOFPROBABILITIES[0],FEED_INFECTION_RATE,HOST_0];
+    let parameters:[f64;9] = [ADJUSTED_TIME_TO_COLONIZE[0],ADJUSTED_TIME_TO_COLONIZE[1],PROBABILITY_OF_HORIZONTAL_TRANSMISSION,RECOVERY_RATE[0],RECOVERY_RATE[1],LISTOFPROBABILITIES[0], FEED_INFECTED,FEED_INFECTION_RATE,HOST_0];
     // let delta:Vec<[f64;9]> = parameterize(ind.clone(),epochs,1,vec![[0.1,0.9,0.1]],vec![(168,50.0),(336,48.9),(504,42.5),(672,52.5),(840,60.0),(1008,70.0),(1176,70.0),(1344,70.0)]); //percentage values MUST be in percentage NOT actual <1 numbers -> reason: using MSE
-    let delta:Vec<[f64;9]> = parameterize(ind.clone(),epochs,1,vec![[0.001,0.007,0.0002],[0.007,0.01,0.003],[0.1,0.9,0.1]],vec![(168,17.5),(336,35.0),(504,45.0),(672,55.0),(840,62.5),(1008,72.5),(1176,72.5),(1344,72.5)]); //percentage values MUST be in percentage NOT actual <1 numbers -> reason: using MSE
+    let delta:Vec<[f64;10]> = parameterize(ind.clone(),epochs,1,vec![[0.1,0.9,0.1]],vec![(168,17.5),(336,35.0),(504,45.0),(672,55.0),(840,62.5),(1008,72.5),(1176,72.5),(1344,72.5)]); //percentage values MUST be in percentage NOT actual <1 numbers -> reason: using MSE
     println!("------------------------------------------------------------------------------------------");
     // println!("Optimized variable value is now operation is {} versus the original {}, with a final MSE score of {}",delta[delta.len()-1][6], (0.95+0.1)/2.0,delta[delta.len()-1][8]);
 
     // Extract the last value of each slice as the y-values
-    let y_values: Vec<f64> = delta.iter().map(|&slice| slice[8]).collect();
-    let hypertext:Vec<String> = delta.iter().map(|&slice| format!("Generation Time Gamma Shape:{} <br> Generation Time Gamma Rate:{} <br> Deposit Contamination Probability:{} <br> Recovery Rate Gamma Shape:{} <br> Recovery Rate Gamma Rate:{} <br> PROBABILITY OF INFECTION:{} <br> Feed Infection rate:{} <br> Number of infected Host 0s:{}",slice[0],slice[1],slice[2],slice[3],slice[4],slice[5],slice[6],slice[7])).collect();
+    let y_values: Vec<f64> = delta.iter().map(|&slice| slice[9]).collect();
+    let hypertext:Vec<String> = delta.iter().map(|&slice| format!("Generation Time Gamma Shape:{} <br> Generation Time Gamma Rate:{} <br> Deposit Contamination Probability:{} <br> Recovery Rate Gamma Shape:{} <br> Recovery Rate Gamma Rate:{} <br> PROBABILITY OF INFECTION:{} <br> Feed Batch Infection Rate :{} <br> Feed Infection rate:{} <br> Number of infected Host 0s:{}",slice[0],slice[1],slice[2],slice[3],slice[4],slice[5],slice[6],slice[7], slice[8])).collect();
     let min_y = y_values.iter().cloned().fold(f64::INFINITY, f64::min);
     let minimum_line:Vec<f64> = vec![min_y;delta.len()];
     println!("min_y vector is {:?}",min_y);
