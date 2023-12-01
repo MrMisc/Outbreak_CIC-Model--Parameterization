@@ -934,30 +934,73 @@ impl host{
         }
         t.powf(0.5)<=transfer_distance && host1.zone == host2.zone
     }
-    // fn transmit(mut inventory:Vec<host>,time:usize)->Vec<host>{//Current version logic: Once the diseased host passes the "test" in fn transfer, then ALL other hosts within distance contract
-    //     //Locate all infected hosts
+
+    // fn transmit(mut inventory: Vec<host>, time: usize) -> Vec<host> {
+    //     // Locate all infected/colonized hosts
     //     let mut cloneof: Vec<host> = inventory.clone();
-    //     cloneof = cloneof.into_iter().filter_map(|mut x|{
-    //         if x.infected{ //x.transfer is how we internalise the probabilistic nature (not definitive way) that a disease can or cannot spread from an infected individual
-    //             Some(x)
-    //         }else{
-    //             None
-    //         }
-    //     }).collect();
-    //     inventory = inventory.into_iter().filter(|x| !x.infected).collect::<Vec<host>>();    
-    //     inventory = inventory.into_iter().filter_map(|mut x|{
-    //         if cloneof.iter().any(|inf| host::dist(&inf,&x) && inf.zone == x.zone){
-    //             let before = x.infected.clone();
-    //             x.infected=x.transfer();
-    //             if !before && x.infected{
-    //                 if x.x!=0.0 && x.y != 0.0{println!("{} {} {} {} {}",x.x,x.y,x.z,time,x.zone);}
+    //     //Infectors
+    //     cloneof = cloneof
+    //         .into_par_iter()
+    //         .filter_map(|mut x| {
+    //             if (x.infected && !COLONIZATION_SPREAD_MODEL) || (COLONIZATION_SPREAD_MODEL && x.colonized){
+    //                 Some(x)
+    //             } else {
+    //                 None
     //             }
-    //             // println!("{} vs {}",&inf.x,&x.x,&inf.y,&x.y);
+    //         })
+    //         .collect();
+    //     // println!("Length of infectors is {}",cloneof.len());
+    //     //to be infected
+    //     if COLONIZATION_SPREAD_MODEL{
+    //         inventory = inventory.into_par_iter().filter(|x| (!x.colonized && x.motile == 0) || (!x.infected && x.motile != 0) ).collect::<Vec<host>>();
+    //     }else{
+    //         inventory = inventory.into_par_iter().filter(|x| !x.infected).collect::<Vec<host>>(); //potentially to save bandwidth, let us remove the concept of colonization in eggs and faeces -> don't need to log colonization in faeces especially!
+    //     }
+    //     //Infection process - both elements concerned here
+    //     inventory = inventory
+    //         .into_par_iter()
+    //         .filter_map(|mut x| {
+    //             for inf in &cloneof {
+    //                 let segment_boundary_condition:bool = !TRANSFERS_ONLY_WITHIN[x.zone] || TRANSFERS_ONLY_WITHIN[x.zone] && x.origin_x == inf.origin_x && x.origin_y == inf.origin_y && x.origin_z == inf.origin_z;
+    //                 let hosttohost_contact_rules:bool = (HOSTTOHOST_CONTACT_SPREAD || !HOSTTOHOST_CONTACT_SPREAD && !(inf.motile == 0 && x.motile ==0));
+    //                 let hosttoegg_contact_rules:bool = (HOSTTOEGG_CONTACT_SPREAD || (!HOSTTOEGG_CONTACT_SPREAD && !(inf.motile == 0 && x.motile == 1)));
+    //                 let hosttofaeces_contact_rules:bool = (HOSTTOFAECES_CONTACT_SPREAD || !HOSTTOFAECES_CONTACT_SPREAD &&!(inf.motile == 0 && x.motile == 2));
+    //                 let eggtohost_contact_rules:bool = (EGGTOHOST_CONTACT_SPREAD || !EGGTOHOST_CONTACT_SPREAD && !(inf.motile == 1 && x.motile == 0));
+    //                 let faecestohost_contact_rules:bool = (FAECESTOHOST_CONTACT_SPREAD || !FAECESTOHOST_CONTACT_SPREAD &&!(inf.motile == 2 && x.motile == 0));
+    //                 let eggtofaeces_contact_rules:bool = (EGGTOFAECES_CONTACT_SPREAD || !EGGTOFAECES_CONTACT_SPREAD && !(inf.motile ==  1 && x.motile == 2));
+    //                 let faecestoegg_contact_rules:bool = (FAECESTOEGG_CONTACT_SPREAD || !FAECESTOEGG_CONTACT_SPREAD && !(inf.motile ==  2 && x.motile == 1));
+    //                 let contact_rules:bool = hosttohost_contact_rules && hosttoegg_contact_rules && hosttofaeces_contact_rules && eggtohost_contact_rules && faecestohost_contact_rules && eggtofaeces_contact_rules && faecestoegg_contact_rules;
+    //                 if host::dist(inf, &x) && inf.zone == x.zone && segment_boundary_condition && contact_rules && !x.infected{ //do not allow for multiple infections to happen at the same time on one host
+    //                     let before = x.infected.clone();
+    //                     x.infected = x.transfer(1.0);
+    //                     if x.infected{x.number_of_times_infected+=1;}
+    //                     if !before && x.infected {
+    //                         if x.x != 0.0 && x.y != 0.0 {
+    //                             let mut diagnostic:i8 = 1;
+    //                             if x.motile>inf.motile{
+    //                                 diagnostic = -1;
+    //                             }
+    //                             // Access properties of 'inf' here
+    //                             println!(
+    //                                 "{} {} {} {} {} {}",
+    //                                 x.x,
+    //                                 x.y,
+    //                                 x.z,
+    //                                 diagnostic*((x.motile+1) as i8) * ((inf.motile+1) as i8), 
+    //                                 time,
+    //                                 x.zone
+    //                             );
+    //                             // if x.zone == 2 && diagnostic*((x.motile+1) as i8) * ((inf.motile+1) as i8)==1{
+    //                             //     println!("INAPPROPRIATE INTERACTION @ zone 2 Delta x : {},Delta y : {},Delta z : {} -> Segments between 2 hosts are the same? : {}",x.x-inf.x,x.y-inf.y,x.z-inf.z,x.origin_x == inf.origin_x&&x.origin_y == inf.origin_y&&x.origin_z == inf.origin_z);
+    //                             //     panic!();
+    //                             // }
+    //                         }
+    //                     }
+    //                 }
+    //             }
     //             Some(x)
-    //         }else{
-    //             Some(x)
-    //         }
-    //     }).collect();
+    //         })
+    //         .collect();
     //     inventory.extend(cloneof);
     //     inventory
     // }
@@ -988,18 +1031,17 @@ impl host{
             .filter_map(|mut x| {
                 for inf in &cloneof {
                     let segment_boundary_condition:bool = !TRANSFERS_ONLY_WITHIN[x.zone] || TRANSFERS_ONLY_WITHIN[x.zone] && x.origin_x == inf.origin_x && x.origin_y == inf.origin_y && x.origin_z == inf.origin_z;
-                    let hosttohost_contact_rules:bool = (HOSTTOHOST_CONTACT_SPREAD || !HOSTTOHOST_CONTACT_SPREAD && !(inf.motile == 0 && x.motile ==0));
-                    let hosttoegg_contact_rules:bool = (HOSTTOEGG_CONTACT_SPREAD || (!HOSTTOEGG_CONTACT_SPREAD && !(inf.motile == 0 && x.motile == 1)));
-                    let hosttofaeces_contact_rules:bool = (HOSTTOFAECES_CONTACT_SPREAD || !HOSTTOFAECES_CONTACT_SPREAD &&!(inf.motile == 0 && x.motile == 2));
-                    let eggtohost_contact_rules:bool = (EGGTOHOST_CONTACT_SPREAD || !EGGTOHOST_CONTACT_SPREAD && !(inf.motile == 1 && x.motile == 0));
-                    let faecestohost_contact_rules:bool = (FAECESTOHOST_CONTACT_SPREAD || !FAECESTOHOST_CONTACT_SPREAD &&!(inf.motile == 2 && x.motile == 0));
-                    let eggtofaeces_contact_rules:bool = (EGGTOFAECES_CONTACT_SPREAD || !EGGTOFAECES_CONTACT_SPREAD && !(inf.motile ==  1 && x.motile == 2));
-                    let faecestoegg_contact_rules:bool = (FAECESTOEGG_CONTACT_SPREAD || !FAECESTOEGG_CONTACT_SPREAD && !(inf.motile ==  2 && x.motile == 1));
-                    let contact_rules:bool = hosttohost_contact_rules && hosttoegg_contact_rules && hosttofaeces_contact_rules && eggtohost_contact_rules && faecestohost_contact_rules && eggtofaeces_contact_rules && faecestoegg_contact_rules;
-                    if host::dist(inf, &x) && inf.zone == x.zone && segment_boundary_condition && contact_rules && !x.infected{ //do not allow for multiple infections to happen at the same time on one host
+                    // let hosttohost_contact_rules:bool = (HOSTTOHOST_CONTACT_SPREAD || !HOSTTOHOST_CONTACT_SPREAD && !(inf.motile == 0 && x.motile ==0));
+                    // let hosttoegg_contact_rules:bool = (HOSTTOEGG_CONTACT_SPREAD || (!HOSTTOEGG_CONTACT_SPREAD && !(inf.motile == 0 && x.motile == 1)));
+                    // let hosttofaeces_contact_rules:bool = (HOSTTOFAECES_CONTACT_SPREAD || !HOSTTOFAECES_CONTACT_SPREAD &&!(inf.motile == 0 && x.motile == 2));
+                    // let eggtohost_contact_rules:bool = (EGGTOHOST_CONTACT_SPREAD || !EGGTOHOST_CONTACT_SPREAD && !(inf.motile == 1 && x.motile == 0));
+                    // let faecestohost_contact_rules:bool = (FAECESTOHOST_CONTACT_SPREAD || !FAECESTOHOST_CONTACT_SPREAD &&!(inf.motile == 2 && x.motile == 0));
+                    // let eggtofaeces_contact_rules:bool = (EGGTOFAECES_CONTACT_SPREAD || !EGGTOFAECES_CONTACT_SPREAD && !(inf.motile ==  1 && x.motile == 2));
+                    // let faecestoegg_contact_rules:bool = (FAECESTOEGG_CONTACT_SPREAD || !FAECESTOEGG_CONTACT_SPREAD && !(inf.motile ==  2 && x.motile == 1));
+                    // let contact_rules:bool = hosttohost_contact_rules && hosttoegg_contact_rules && hosttofaeces_contact_rules && eggtohost_contact_rules && faecestohost_contact_rules && eggtofaeces_contact_rules && faecestoegg_contact_rules;
+                    if host::dist(inf, &x) && inf.zone == x.zone && segment_boundary_condition && (inf.motile == 2 && x.motile == 0) && !x.infected{
                         let before = x.infected.clone();
                         x.infected = x.transfer(1.0);
-                        if x.infected{x.number_of_times_infected+=1;}
                         if !before && x.infected {
                             if x.x != 0.0 && x.y != 0.0 {
                                 let mut diagnostic:i8 = 1;
@@ -1029,7 +1071,7 @@ impl host{
             .collect();
         inventory.extend(cloneof);
         inventory
-    }
+    }    
     
     
     fn contaminate(mut inventory: Vec<host>, time: usize)->Vec<host>{
@@ -1633,7 +1675,7 @@ fn main(){
     let epochs:usize = 50;
     //Changing parameter values 
     //parameters vector is to contain the following parameters in order : [ADJUSTED COLONIZATION TIME 0,ADJUSTED COLONIZATION TIME 1,Deposit probability (horizontal), recovery rate 0, recovery rate 1, probability of disease transmission (contact),feed infection probability ]
-    let parameters:[f64;9] = [ADJUSTED_TIME_TO_COLONIZE[0],ADJUSTED_TIME_TO_COLONIZE[1],PROBABILITY_OF_HORIZONTAL_TRANSMISSION,RECOVERY_RATE[0],RECOVERY_RATE[1],LISTOFPROBABILITIES[0], FEED_INFECTED,FEED_INFECTION_RATE,HOST_0];
+    // let parameters:[f64;9] = [ADJUSTED_TIME_TO_COLONIZE[0],ADJUSTED_TIME_TO_COLONIZE[1],PROBABILITY_OF_HORIZONTAL_TRANSMISSION,RECOVERY_RATE[0],RECOVERY_RATE[1],LISTOFPROBABILITIES[0], FEED_INFECTED,FEED_INFECTION_RATE,HOST_0];
     // let delta:Vec<[f64;9]> = parameterize(ind.clone(),epochs,1,vec![[0.1,0.9,0.1]],vec![(168,50.0),(336,48.9),(504,42.5),(672,52.5),(840,60.0),(1008,70.0),(1176,70.0),(1344,70.0)]); //percentage values MUST be in percentage NOT actual <1 numbers -> reason: using MSE
     let delta:Vec<[f64;10]> = parameterize(ind.clone(),epochs,1,vec![[0.1,0.9,0.1]],vec![(168,17.5),(336,35.0),(504,45.0),(672,55.0),(840,62.5),(1008,72.5),(1176,72.5),(1344,72.5)]); //percentage values MUST be in percentage NOT actual <1 numbers -> reason: using MSE
     println!("------------------------------------------------------------------------------------------");
