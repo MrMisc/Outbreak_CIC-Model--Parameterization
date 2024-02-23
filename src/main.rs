@@ -805,7 +805,7 @@ impl host{
         vector
     }
     fn infect_multiple(mut vector:Vec<host>,loc_x:u64,loc_y:u64,loc_z:u64,n:usize,zone:usize, colonized:bool)->Vec<host>{ //homogeneous application ->Periodically apply across space provided,->Once per location
-        let mut filtered_vector: Vec<&mut host> = vector.iter_mut().filter(|host| host.zone == zone).collect();
+        let mut filtered_vector: Vec<&mut host> = vector.iter_mut().filter(|host| host.zone == zone && !host.infected).collect();
 
         filtered_vector.sort_by_key(|host| {
             let dx = host.origin_x as i64 - loc_x as i64;
@@ -1221,7 +1221,7 @@ impl host{
         cloneof = cloneof
             .into_par_iter()
             .filter_map(|mut x| {
-                if (x.infected && !COLONIZATION_SPREAD_MODEL) || (COLONIZATION_SPREAD_MODEL && x.colonized){
+                if (x.infected && !COLONIZATION_SPREAD_MODEL) || (COLONIZATION_SPREAD_MODEL && x.colonized && !x.eviscerated){
                     Some(x)
                 } else {
                     None
@@ -1231,9 +1231,9 @@ impl host{
         // println!("Length of infectors is {}",cloneof.len());
         //to be infected
         if COLONIZATION_SPREAD_MODEL{
-            inventory = inventory.into_par_iter().filter(|x| (!x.colonized && x.motile == 0) || (!x.infected && x.motile != 0) ).collect::<Vec<host>>();
+            inventory = inventory.into_par_iter().filter(|x| ((!x.colonized && x.motile == 0) || (!x.infected && x.motile != 0) && !x.eviscerated) ).collect::<Vec<host>>();
         }else{
-            inventory = inventory.into_par_iter().filter(|x| !x.infected).collect::<Vec<host>>(); //potentially to save bandwidth, let us remove the concept of colonization in eggs and faeces -> don't need to log colonization in faeces especially!
+            inventory = inventory.into_par_iter().filter(|x| !x.infected && !x.eviscerated).collect::<Vec<host>>(); //potentially to save bandwidth, let us remove the concept of colonization in eggs and faeces -> don't need to log colonization in faeces especially!
         }
         //Infection process - both elements concerned here
         inventory = inventory
@@ -1249,7 +1249,7 @@ impl host{
                     // let eggtofaeces_contact_rules:bool = (EGGTOFAECES_CONTACT_SPREAD || !EGGTOFAECES_CONTACT_SPREAD && !(inf.motile ==  1 && x.motile == 2));
                     // let faecestoegg_contact_rules:bool = (FAECESTOEGG_CONTACT_SPREAD || !FAECESTOEGG_CONTACT_SPREAD && !(inf.motile ==  2 && x.motile == 1));
                     // let contact_rules:bool = hosttohost_contact_rules && hosttoegg_contact_rules && hosttofaeces_contact_rules && eggtohost_contact_rules && faecestohost_contact_rules && eggtofaeces_contact_rules && faecestoegg_contact_rules;
-                    if host::dist(inf, &x) && inf.zone == x.zone && segment_boundary_condition && (inf.motile == 2 && x.motile == 0) && !x.infected{
+                    if host::dist(inf, &x) && inf.zone == x.zone && segment_boundary_condition && (inf.motile == 2 && x.motile == 0) && !x.infected && inf.zone<=SLAUGHTER_POINT{
                         let before = x.infected.clone();
                         x.infected = x.transfer(1.0);
                         if !before && x.infected {
@@ -1291,7 +1291,7 @@ impl host{
         cloneof = cloneof
             .into_par_iter()
             .filter_map(|mut x| {
-                if (x.contaminated){
+                if (x.contaminated && !x.eviscerated){
                     Some(x)
                 } else {
                     None
@@ -1305,7 +1305,7 @@ impl host{
         // }else{
         //     inventory = inventory.into_par_iter().filter(|x| !x.infected).collect::<Vec<host>>(); //potentially to save bandwidth, let us remove the concept of colonization in eggs and faeces -> don't need to log colonization in faeces especially!
         // }
-        inventory = inventory.into_par_iter().filter(|x| !x.contaminated).collect::<Vec<host>>();
+        inventory = inventory.into_par_iter().filter(|x| !x.contaminated && !x.eviscerated).collect::<Vec<host>>();
         //Infection process - both elements concerned here
         inventory = inventory
             .into_par_iter()
@@ -1320,7 +1320,7 @@ impl host{
                     let eggtofaeces_contact_rules:bool = (EGGTOFAECES_CONTACT_SPREAD || !EGGTOFAECES_CONTACT_SPREAD && !(inf.motile ==  1 && x.motile == 2));
                     let faecestoegg_contact_rules:bool = (FAECESTOEGG_CONTACT_SPREAD || !FAECESTOEGG_CONTACT_SPREAD && !(inf.motile ==  2 && x.motile == 1));
                     let contact_rules:bool = hosttohost_contact_rules && hosttoegg_contact_rules && hosttofaeces_contact_rules && eggtohost_contact_rules && faecestohost_contact_rules && eggtofaeces_contact_rules && faecestoegg_contact_rules;
-                    if host::dist(inf, &x) && inf.zone == x.zone && segment_boundary_condition && contact_rules && !x.contaminated{
+                    if host::dist(inf, &x) && inf.zone == x.zone && segment_boundary_condition && contact_rules && !x.contaminated && !x.eviscerated && !inf.eviscerated{
                         let before = x.contaminated.clone();
                         x.contaminated = roll(x.prob2);
                         if !before && x.contaminated {
