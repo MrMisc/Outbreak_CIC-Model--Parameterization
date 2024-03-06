@@ -687,6 +687,7 @@ const EVISCERATE_ZONES:[usize;1] = [2]; //Zone in which evisceration takes place
 const EVISCERATE_DECAY:u8 = 5;
 const NO_OF_EVISCERATORS:[usize;1] = [6];
 const EVISCERATOR_TO_HOST_PROBABILITY_DECAY:f64 = 0.25;   //Multiplicative decrease of  probability - starting from LISTOFPROBABILITIES value 100%->75% (if 0.25 is value)->50% ->25%->0%
+const CLEAN_EVISCERATORS:bool = false; //Be sure to set the hours when eviscerators are manually cleaned yourself (Might need to run simulation to figure out when evisceraors get  used at all)
 
 //Curvvature configuration consideration for evisceration process being in a semi cirlce configuration
 const CURVATURE:bool = true;
@@ -1601,6 +1602,16 @@ fn test(parameters:[f64;9],fit_to:Vec<(usize,f64)>)->f64{
                 zones[zone].eviscerate(&mut eviscerators,&mut hosts,time.clone());
             }
         }
+
+        //Periodically cleaning eviscerators
+        if (time==3 || time==5 || time==7) && CLEAN_EVISCERATORS{
+            // println!("Cleaning eviscerators!");
+            eviscerators.iter_mut().for_each(|mut ev|{
+                ev.infected = false;
+            })
+        }
+        
+        
         let mut FinalZone:&mut Zone_3D = &mut zones[GRIDSIZE.len()-1];
         [hosts,collect] = host::collect__(hosts,&mut FinalZone);
 
